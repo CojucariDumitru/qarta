@@ -9,13 +9,13 @@ export interface AuthedRequest extends Request {
 export function requireAdmin(req: AuthedRequest, res: Response, next: NextFunction) {
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Не авторизован' });
+    return res.status(401).json({ error: 'Not authorized' });
   }
   try {
     const payload = jwt.verify(header.slice(7), env.JWT_SECRET) as { sub: string };
     req.userId = payload.sub;
     next();
   } catch {
-    return res.status(401).json({ error: 'Сессия истекла' });
+    return res.status(401).json({ error: 'Session expired' });
   }
 }

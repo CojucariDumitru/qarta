@@ -4,7 +4,7 @@ import { Pencil, Plus, Trash2, X } from 'lucide-react';
 import { api } from '../api';
 import { money, type Category, type MenuItem } from '../types';
 
-type Draft = Partial<MenuItem> & { price?: string };
+type Draft = Partial<Omit<MenuItem, 'price'>> & { price?: string };
 
 export default function MenuAdminPage() {
   const qc = useQueryClient();
@@ -25,7 +25,8 @@ export default function MenuAdminPage() {
       const payload = {
         name: d.name,
         description: d.description ?? '',
-        price: Number(d.price),
+        ayce: d.ayce ?? true,
+        price: d.ayce ? 0 : Number(d.price ?? 0),
         image: d.image,
         categoryId: d.categoryId,
         available: d.available ?? true,
@@ -53,12 +54,12 @@ export default function MenuAdminPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="display text-2xl font-extrabold">Меню</h1>
+        <h1 className="display text-2xl font-extrabold">Menu</h1>
         <button
-          onClick={() => setEditing({ categoryId: categories?.[0]?.id })}
+          onClick={() => setEditing({ categoryId: categories?.[0]?.id, ayce: true })}
           className="bg-flame text-ink font-bold rounded-full px-4 py-2 text-sm flex items-center gap-1.5"
         >
-          <Plus size={15} /> Блюдо
+          <Plus size={15} /> Item
         </button>
       </div>
 
@@ -73,7 +74,7 @@ export default function MenuAdminPage() {
                   <p className={`text-sm font-semibold truncate ${i.available ? '' : 'line-through text-muted'}`}>
                     {i.name}
                   </p>
-                  <p className="text-xs text-muted">{money(i.price)}</p>
+                  <p className="text-xs text-muted">{i.ayce ? 'AYCE' : money(i.price)}</p>
                 </div>
                 <button
                   onClick={() => toggle.mutate(i)}
@@ -81,9 +82,9 @@ export default function MenuAdminPage() {
                     i.available ? 'border-emerald-500/40 text-emerald-300' : 'hairline text-muted'
                   }`}
                 >
-                  {i.available ? 'в продаже' : 'скрыто'}
+                  {i.available ? 'available' : '86\'d'}
                 </button>
-                <button onClick={() => setEditing({ ...i })} className="text-muted hover:text-cream p-1">
+                <button onClick={() => setEditing({ ...i, price: String(i.price) })} className="text-muted hover:text-cream p-1">
                   <Pencil size={15} />
                 </button>
                 <button onClick={() => remove.mutate(i.id)} className="text-muted hover:text-red-400 p-1">
@@ -95,48 +96,76 @@ export default function MenuAdminPage() {
         </div>
       ))}
 
-      {/* editor modal */}
       {editing && (
         <div className="fixed inset-0 bg-black/70 z-50 grid place-items-center p-5 overflow-y-auto">
           <div className="bg-paper rounded-3xl p-6 w-full max-w-md">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="display font-bold text-lg">{editing.id ? 'Изменить блюдо' : 'Новое блюдо'}</h3>
-              <button onClick={() => setEditing(null)}><X size={18} /></button>
+              <h3 className="display font-bold text-lg">{editing.id ? 'Edit item' : 'New item'}</h3>
+              <button onClick={() => setEditing(null)}>
+                <X size={18} />
+              </button>
             </div>
             <div className="space-y-2">
-              <Field label="Название" value={editing.name ?? ''} onChange={(v) => setEditing({ ...editing, name: v })} />
-              <Field label="Описание" value={editing.description ?? ''} onChange={(v) => setEditing({ ...editing, description: v })} />
-              <Field label="Цена, $" value={String(editing.price ?? '')} onChange={(v) => setEditing({ ...editing, price: v })} />
-              <Field label="URL фото" value={editing.image ?? ''} onChange={(v) => setEditing({ ...editing, image: v })} />
+              <Field label="Name" value={editing.name ?? ''} onChange={(v) => setEditing({ ...editing, name: v })} />
+              <Field
+                label="Description"
+                value={editing.description ?? ''}
+                onChange={(v) => setEditing({ ...editing, description: v })}
+              />
+              <label className="flex items-center justify-between text-sm py-1">
+                <span>Included in AYCE</span>
+                <input
+                  type="checkbox"
+                  checked={editing.ayce ?? true}
+                  onChange={(e) => setEditing({ ...editing, ayce: e.target.checked })}
+                  className="accent-[#FF6B2C] w-4 h-4"
+                />
+              </label>
+              {!editing.ayce && (
+                <Field label="Price, $" value={editing.price ?? ''} onChange={(v) => setEditing({ ...editing, price: v })} />
+              )}
+              <Field label="Photo URL" value={editing.image ?? ''} onChange={(v) => setEditing({ ...editing, image: v })} />
               <label className="block text-xs text-muted">
-                Категория
+                Category
                 <select
                   value={editing.categoryId}
                   onChange={(e) => setEditing({ ...editing, categoryId: e.target.value })}
                   className="w-full mt-1 bg-ink rounded-xl px-3 py-2.5 border hairline outline-none text-cream text-sm"
                 >
                   {categories?.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
                   ))}
                 </select>
               </label>
               <div className="flex gap-4 pt-1 text-sm">
                 <label className="flex items-center gap-1.5">
-                  <input type="checkbox" checked={editing.popular ?? false} onChange={(e) => setEditing({ ...editing, popular: e.target.checked })} className="accent-[#FF6B2C]" />
-                  Хит
+                  <input
+                    type="checkbox"
+                    checked={editing.popular ?? false}
+                    onChange={(e) => setEditing({ ...editing, popular: e.target.checked })}
+                    className="accent-[#FF6B2C]"
+                  />
+                  Bestseller
                 </label>
                 <label className="flex items-center gap-1.5">
-                  <input type="checkbox" checked={editing.spicy ?? false} onChange={(e) => setEditing({ ...editing, spicy: e.target.checked })} className="accent-[#FF6B2C]" />
-                  Острое
+                  <input
+                    type="checkbox"
+                    checked={editing.spicy ?? false}
+                    onChange={(e) => setEditing({ ...editing, spicy: e.target.checked })}
+                    className="accent-[#FF6B2C]"
+                  />
+                  Spicy
                 </label>
               </div>
             </div>
             <button
               onClick={() => save.mutate(editing)}
-              disabled={save.isPending || !editing.name || !editing.price || !editing.image}
+              disabled={save.isPending || !editing.name || !editing.image || (!editing.ayce && !editing.price)}
               className="w-full mt-5 bg-flame text-ink font-bold rounded-2xl py-3.5 disabled:opacity-50"
             >
-              Сохранить
+              Save
             </button>
           </div>
         </div>

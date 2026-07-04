@@ -18,7 +18,7 @@ export default function LoginPage() {
       localStorage.setItem('qarta_token', data.token);
       navigate('/admin');
     } catch {
-      setErr('Неверный email или пароль');
+      setErr('Wrong email or password');
     } finally {
       setBusy(false);
     }
@@ -27,8 +27,8 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen grid place-items-center px-5">
       <form onSubmit={submit} className="w-full max-w-sm">
-        <p className="text-[11px] tracking-[0.25em] text-flame font-semibold">QARTA · РЕСТОРАН</p>
-        <h1 className="display text-3xl font-extrabold mt-1 mb-8">Вход для персонала</h1>
+        <p className="text-[11px] tracking-[0.25em] text-flame font-semibold">QARTA · STAFF</p>
+        <h1 className="display text-3xl font-extrabold mt-1 mb-8">Staff sign in</h1>
         <input
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -39,7 +39,7 @@ export default function LoginPage() {
         <input
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="Пароль"
+          placeholder="Password"
           type="password"
           className="w-full bg-paper rounded-xl px-4 py-3.5 outline-none border hairline focus:border-flame/50"
         />
@@ -48,9 +48,9 @@ export default function LoginPage() {
           disabled={busy}
           className="w-full mt-4 bg-flame text-ink font-bold rounded-2xl py-4 disabled:opacity-50"
         >
-          {busy ? 'Входим…' : 'Войти'}
+          {busy ? 'Signing in…' : 'Sign in'}
         </button>
-        <p className="text-muted text-xs mt-4 text-center">демо: admin@qarta.app / Qarta2024!</p>
+        <p className="text-muted text-xs mt-4 text-center">demo: admin@qarta.app / Qarta2024!</p>
       </form>
     </div>
   );

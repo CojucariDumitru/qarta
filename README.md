@@ -1,44 +1,51 @@
-# QARTA — QR-меню и лояльность для ресторанов
+# QARTA — QR ordering & loyalty for AYCE restaurants
 
-Платформа в духе TapTable: гость сканирует QR на столе, заказывает сам и копит кэшбэк-баллы; ресторан получает живую доску заказов, карту зала, CRM гостей и аналитику.
+Guests scan the QR on their table, set the party size and order rounds from their phones; every plate is ticked off as it lands on the table; the bill (AYCE per person + drinks) closes in one tap with loyalty cashback.
 
 **Live:** https://qarta-teal.vercel.app · API: https://qarta-api.vercel.app/api/health
 
-## Возможности
+Demo restaurant: **KAIYO** — Asian Grill & Sushi, All You Can Eat ($29.90/person).
 
-**Гость** (`/m/:tableCode`, mobile-first)
-- QR-меню с фото и категориями, корзина, заказ на стол
-- Вызов официанта
-- Карта лояльности: кэшбэк 5–10% баллами (Bronze / Silver / Gold), оплата баллами до 50% чека
-- Экран статуса заказа (обновляется каждые 5 секунд)
+## How it works
 
-**Ресторан** (`/admin`)
-- Живая доска заказов со сменой статусов (Новый → Принят → Готовится → Подан → Оплачен), звуковой сигнал и бейдж на новые заказы
-- Интерактивная карта зала (SVG-план: бар, кухня, терраса): занятость столов, пульсация при вызове официанта, панель стола с заказами и QR, режим редактора с перетаскиванием столов
-- CRUD меню со стоп-листом
-- CRM гостей: визиты, траты, баллы, уровень
-- Дашборд: выручка за 7 дней, средний чек, топ блюд
+**Guest** (`/m/:tableCode`, mobile-first)
+- Scan the table QR → set party size → the seating opens
+- Order unlimited AYCE rounds (sushi, ramen, onigiri, robata skewers…); drinks are priced separately
+- Round cap: 5 AYCE items per person per round (configurable)
+- **Your table** tab: everything ordered with live status — cooking → delivered ✓ — plus the running bill
+- Call waiter / request bill; attach a rewards card for cashback (Bronze 5% / Silver 7% / Gold 10%, redeem up to 50% of a bill)
 
-**Лендинг** (`/`) — витрина продукта с тарифами и акцией «лояльность в подарок при годовом пакете».
+**Staff** (`/admin`)
+- Interactive SVG floor map (sushi bar, kitchen, terrace): seated tables show party size + pending plates, waiter/bill calls pulse; drag tables in edit mode to match your room
+- Table drawer: open a seating, adjust the party, **tick off delivered items**, close the bill with optional points redemption
+- Rounds board with per-item delivery checkboxes, chime + badge on new rounds
+- Menu management with AYCE/priced toggle and 86'ing
+- Guest CRM (visits, spend, tier) and dashboard (revenue, covers, avg per cover, top dishes)
+- Settings: restaurant name, AYCE price, round limit — applied to guests instantly
 
-## Стек
+## Stack
 
-- `server/` — Express + TypeScript + Prisma → Neon Postgres (база `qarta`)
+- `server/` — Express + TypeScript + Prisma → Neon Postgres (runs as a single Vercel serverless function in prod)
 - `client/` — React 18 + Vite + Tailwind + Framer Motion + TanStack Query
 
-## Запуск
+## Run locally
 
 ```bash
-# API (порт 5056)
+# API (port 5056)
 cd server && npm install && npm run dev
 
-# Клиент (порт 5175, проксирует /api на 5056)
+# Client (port 5175, proxies /api to 5056, exposed on LAN for phone QR testing)
 cd client && npm install && npm run dev
 ```
 
-Демо-доступы:
-- Админ: `admin@qarta.app` / `Qarta2024!`
-- Гость: любой телефон (например `+77015550101` — уже с историей)
-- Демо-стол: http://localhost:5175/m/t1 … /m/t8
+Demo access:
+- Staff: `admin@qarta.app` / `Qarta2024!`
+- Guest: any phone number (`+15550100101` — Emma — already has history and points)
+- Demo tables: `/m/t1` … `/m/t8`
 
-Фото блюд переиспользуются из Cloudinary проекта GRINDHOUSE.
+Dish photos are Wikipedia lead images re-hosted in Cloudinary (`server/scripts/upload-images.mjs`).
+
+## Deploy
+
+Both halves ship to Vercel via CLI: `npx vercel deploy --prod --yes` in `server/` and `client/`.
+Server env vars: `DATABASE_URL`, `JWT_SECRET`, `CLIENT_ORIGIN`. Client: `VITE_API_URL` in `.env.production`.

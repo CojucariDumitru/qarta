@@ -1,7 +1,15 @@
+export interface Config {
+  name: string;
+  tagline: string;
+  aycePrice: number;
+  roundLimit: number;
+}
+
 export interface MenuItem {
   id: string;
   name: string;
   description: string;
+  ayce: boolean;
   price: string;
   image: string;
   available: boolean;
@@ -15,6 +23,53 @@ export interface Category {
   name: string;
   sort: number;
   items: MenuItem[];
+}
+
+export interface TableInfo {
+  id: string;
+  number: number;
+  zone: string;
+  session: { id: string; guests: number; openedAt: string } | null;
+}
+
+export type RoundStatus = 'NEW' | 'DONE' | 'CANCELLED';
+
+export interface RoundItem {
+  id: string;
+  name: string;
+  ayce: boolean;
+  price: string;
+  qty: number;
+  delivered: boolean;
+}
+
+export interface Round {
+  id: string;
+  number: number;
+  status: RoundStatus;
+  extrasTotal: string;
+  comment?: string | null;
+  createdAt: string;
+  items: RoundItem[];
+}
+
+export interface SessionDetail {
+  id: string;
+  status: 'OPEN' | 'CLOSED';
+  guests: number;
+  openedAt: string;
+  closedAt?: string | null;
+  table: { number: number; zone: string; code: string };
+  loyaltyGuest: { id: string; name: string | null; phone: string } | null;
+  orders: Round[];
+  bill: {
+    aycePrice: number;
+    ayceTotal: number;
+    extras: number;
+    discount: number;
+    total: number;
+  };
+  roundLimit: number;
 }
 
 export interface GuestCard {
@@ -35,23 +90,6 @@ export interface LoyaltyTx {
   createdAt: string;
 }
 
-export type OrderStatus = 'NEW' | 'ACCEPTED' | 'PREPARING' | 'SERVED' | 'PAID' | 'CANCELLED';
-
-export interface Order {
-  id: string;
-  number: number;
-  status: OrderStatus;
-  subtotal: string;
-  discount: string;
-  total: string;
-  comment?: string | null;
-  createdAt: string;
-  earned?: number;
-  items: { id: string; name: string; price: string; qty: number }[];
-  table?: { number: number; zone?: string };
-  guest?: { name: string | null; phone: string } | null;
-}
-
 export interface AdminTable {
   id: string;
   number: number;
@@ -61,16 +99,17 @@ export interface AdminTable {
   posX: number;
   posY: number;
   shape: 'round' | 'square' | 'rect';
-  orders: {
+  calls: { id: string; kind: 'WAITER' | 'BILL'; createdAt: string }[];
+  session: { id: string; guests: number; openedAt: string; pendingItems: number } | null;
+}
+
+export interface AdminRound extends Round {
+  session: {
     id: string;
-    number: number;
-    status: OrderStatus;
-    total: string;
-    createdAt: string;
-    comment?: string | null;
-    items: { id: string; name: string; qty: number }[];
-  }[];
-  calls: { id: string; createdAt: string }[];
+    guests: number;
+    table: { number: number; zone: string };
+    guest: { name: string | null } | null;
+  };
 }
 
 export interface CrmGuest {
@@ -86,21 +125,20 @@ export interface CrmGuest {
 
 export interface Stats {
   todayRevenue: number;
-  todayOrders: number;
-  avgCheck: number;
-  guests: number;
+  todaySessions: number;
+  covers: number;
+  avgPerCover: number;
+  openNow: number;
   topDishes: { name: string; qty: number }[];
   series: { date: string; revenue: number }[];
 }
 
-export const STATUS_LABEL: Record<OrderStatus, string> = {
-  NEW: 'Новый',
-  ACCEPTED: 'Принят',
-  PREPARING: 'Готовится',
-  SERVED: 'Подан',
-  PAID: 'Оплачен',
-  CANCELLED: 'Отменён',
-};
+export interface Settings {
+  name: string;
+  tagline: string;
+  aycePrice: number;
+  roundLimit: number;
+}
 
 export const money = (v: number | string) => `$${Number(v).toFixed(2)}`;
 export const pts = (p: number) => `${(p / 100).toFixed(2)}`;

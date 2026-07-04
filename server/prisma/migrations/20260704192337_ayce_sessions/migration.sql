@@ -10,6 +10,17 @@ CREATE TABLE "User" (
 );
 
 -- CreateTable
+CREATE TABLE "Settings" (
+    "id" INTEGER NOT NULL DEFAULT 1,
+    "name" TEXT NOT NULL DEFAULT 'KAIYO',
+    "tagline" TEXT NOT NULL DEFAULT 'Asian Grill & Sushi · All You Can Eat',
+    "aycePrice" DECIMAL(10,2) NOT NULL DEFAULT 29.90,
+    "roundLimit" INTEGER NOT NULL DEFAULT 5,
+
+    CONSTRAINT "Settings_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "Category" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
@@ -23,7 +34,8 @@ CREATE TABLE "MenuItem" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT NOT NULL,
-    "price" DECIMAL(10,2) NOT NULL,
+    "ayce" BOOLEAN NOT NULL DEFAULT true,
+    "price" DECIMAL(10,2) NOT NULL DEFAULT 0,
     "image" TEXT NOT NULL,
     "available" BOOLEAN NOT NULL DEFAULT true,
     "popular" BOOLEAN NOT NULL DEFAULT false,
@@ -39,9 +51,27 @@ CREATE TABLE "Table" (
     "number" INTEGER NOT NULL,
     "code" TEXT NOT NULL,
     "seats" INTEGER NOT NULL DEFAULT 2,
-    "zone" TEXT NOT NULL DEFAULT 'Зал',
+    "zone" TEXT NOT NULL DEFAULT 'Main Hall',
+    "posX" DOUBLE PRECISION NOT NULL DEFAULT 10,
+    "posY" DOUBLE PRECISION NOT NULL DEFAULT 10,
+    "shape" TEXT NOT NULL DEFAULT 'square',
 
     CONSTRAINT "Table_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "TableSession" (
+    "id" TEXT NOT NULL,
+    "tableId" TEXT NOT NULL,
+    "guests" INTEGER NOT NULL DEFAULT 2,
+    "status" TEXT NOT NULL DEFAULT 'OPEN',
+    "guestId" TEXT,
+    "discount" DECIMAL(10,2) NOT NULL DEFAULT 0,
+    "total" DECIMAL(10,2) NOT NULL DEFAULT 0,
+    "openedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "closedAt" TIMESTAMP(3),
+
+    CONSTRAINT "TableSession_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -68,7 +98,7 @@ CREATE TABLE "LoyaltyAccount" (
 CREATE TABLE "LoyaltyTransaction" (
     "id" TEXT NOT NULL,
     "accountId" TEXT NOT NULL,
-    "orderId" TEXT,
+    "sessionId" TEXT,
     "type" TEXT NOT NULL,
     "points" INTEGER NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -80,15 +110,11 @@ CREATE TABLE "LoyaltyTransaction" (
 CREATE TABLE "Order" (
     "id" TEXT NOT NULL,
     "number" SERIAL NOT NULL,
-    "tableId" TEXT NOT NULL,
-    "guestId" TEXT,
+    "sessionId" TEXT NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'NEW',
-    "subtotal" DECIMAL(10,2) NOT NULL,
-    "discount" DECIMAL(10,2) NOT NULL DEFAULT 0,
-    "total" DECIMAL(10,2) NOT NULL,
+    "extrasTotal" DECIMAL(10,2) NOT NULL DEFAULT 0,
     "comment" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Order_pkey" PRIMARY KEY ("id")
 );
@@ -99,8 +125,10 @@ CREATE TABLE "OrderItem" (
     "orderId" TEXT NOT NULL,
     "menuItemId" TEXT,
     "name" TEXT NOT NULL,
-    "price" DECIMAL(10,2) NOT NULL,
+    "ayce" BOOLEAN NOT NULL DEFAULT true,
+    "price" DECIMAL(10,2) NOT NULL DEFAULT 0,
     "qty" INTEGER NOT NULL,
+    "delivered" BOOLEAN NOT NULL DEFAULT false,
 
     CONSTRAINT "OrderItem_pkey" PRIMARY KEY ("id")
 );
@@ -109,6 +137,7 @@ CREATE TABLE "OrderItem" (
 CREATE TABLE "WaiterCall" (
     "id" TEXT NOT NULL,
     "tableId" TEXT NOT NULL,
+    "kind" TEXT NOT NULL DEFAULT 'WAITER',
     "status" TEXT NOT NULL DEFAULT 'OPEN',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -140,16 +169,19 @@ CREATE UNIQUE INDEX "Order_number_key" ON "Order"("number");
 ALTER TABLE "MenuItem" ADD CONSTRAINT "MenuItem_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "Category"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "TableSession" ADD CONSTRAINT "TableSession_tableId_fkey" FOREIGN KEY ("tableId") REFERENCES "Table"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "TableSession" ADD CONSTRAINT "TableSession_guestId_fkey" FOREIGN KEY ("guestId") REFERENCES "Guest"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "LoyaltyAccount" ADD CONSTRAINT "LoyaltyAccount_guestId_fkey" FOREIGN KEY ("guestId") REFERENCES "Guest"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "LoyaltyTransaction" ADD CONSTRAINT "LoyaltyTransaction_accountId_fkey" FOREIGN KEY ("accountId") REFERENCES "LoyaltyAccount"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Order" ADD CONSTRAINT "Order_tableId_fkey" FOREIGN KEY ("tableId") REFERENCES "Table"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Order" ADD CONSTRAINT "Order_guestId_fkey" FOREIGN KEY ("guestId") REFERENCES "Guest"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "Order" ADD CONSTRAINT "Order_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "TableSession"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "OrderItem" ADD CONSTRAINT "OrderItem_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "Order"("id") ON DELETE CASCADE ON UPDATE CASCADE;

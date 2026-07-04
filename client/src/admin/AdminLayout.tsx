@@ -1,19 +1,28 @@
 import { useEffect, useRef } from 'react';
 import { NavLink, Navigate, Outlet, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { LayoutGrid, ListOrdered, LogOut, UtensilsCrossed, Users, BarChart3 } from 'lucide-react';
+import {
+  LayoutGrid,
+  ListOrdered,
+  LogOut,
+  Settings,
+  UtensilsCrossed,
+  Users,
+  BarChart3,
+} from 'lucide-react';
 import { api } from '../api';
-import type { Order } from '../types';
+import type { AdminRound } from '../types';
 
 const NAV = [
-  { to: '/admin', end: true, label: 'Дашборд', icon: BarChart3 },
-  { to: '/admin/orders', label: 'Заказы', icon: ListOrdered, badge: true },
-  { to: '/admin/tables', label: 'Зал', icon: LayoutGrid },
-  { to: '/admin/menu', label: 'Меню', icon: UtensilsCrossed },
-  { to: '/admin/guests', label: 'Гости', icon: Users },
+  { to: '/admin', end: true, label: 'Dashboard', icon: BarChart3 },
+  { to: '/admin/orders', label: 'Rounds', icon: ListOrdered, badge: true },
+  { to: '/admin/tables', label: 'Floor', icon: LayoutGrid },
+  { to: '/admin/menu', label: 'Menu', icon: UtensilsCrossed },
+  { to: '/admin/guests', label: 'Guests', icon: Users },
+  { to: '/admin/settings', label: 'Settings', icon: Settings },
 ];
 
-/** Two-tone chime for a fresh order (works after any user interaction with the page). */
+/** Two-tone chime for a fresh round (works after any user interaction with the page). */
 function chime() {
   try {
     const ctx = new AudioContext();
@@ -39,27 +48,27 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const authed = !!localStorage.getItem('qarta_token');
 
-  // watch active orders on every admin page: badge + chime on new
+  // watch active rounds on every staff page: badge + chime on new
   const { data: active } = useQuery({
     queryKey: ['admin-orders-watch'],
-    queryFn: async () => (await api.get<Order[]>('/admin/orders')).data,
+    queryFn: async () => (await api.get<AdminRound[]>('/admin/orders')).data,
     refetchInterval: 6000,
     enabled: authed,
   });
-  const newCount = active?.filter((o) => o.status === 'NEW').length ?? 0;
+  const newCount = active?.length ?? 0;
 
   const prev = useRef<Set<string> | null>(null);
   useEffect(() => {
     if (!active) return;
-    const ids = new Set(active.filter((o) => o.status === 'NEW').map((o) => o.id));
+    const ids = new Set(active.map((o) => o.id));
     if (prev.current && [...ids].some((id) => !prev.current!.has(id))) chime();
     prev.current = ids;
   }, [active]);
 
   useEffect(() => {
-    document.title = newCount > 0 ? `(${newCount}) Заказы — QARTA` : 'QARTA — кабинет ресторана';
+    document.title = newCount > 0 ? `(${newCount}) Rounds — QARTA` : 'QARTA — staff';
     return () => {
-      document.title = 'QARTA — QR-меню и лояльность для ресторанов';
+      document.title = 'QARTA — QR menu & ordering for AYCE restaurants';
     };
   }, [newCount]);
 
@@ -95,7 +104,7 @@ export default function AdminLayout() {
           }}
           className="flex items-center gap-2.5 px-3 py-2 text-sm text-muted hover:text-cream md:mt-auto"
         >
-          <LogOut size={16} /> Выйти
+          <LogOut size={16} /> Sign out
         </button>
       </aside>
       <main className="flex-1 p-5 md:p-8 max-w-6xl">
