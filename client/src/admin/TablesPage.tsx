@@ -1,10 +1,11 @@
 import { useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Bell, Check, ExternalLink, Minus, Move, Plus, Receipt, Users, X } from 'lucide-react';
+import { Bell, Check, ExternalLink, Minus, Move, Plus, Printer, Receipt, Timer, Users, X } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { api } from '../api';
-import { money, pts, type AdminTable, type SessionDetail } from '../types';
+import { minutesSince, money, pts, type AdminTable, type Config, type SessionDetail } from '../types';
 import { useGuestCardQuery } from './useGuestCard';
 
 /* Floor plan drawn in a fixed 100×64 viewBox; table posX/posY are centers. */
@@ -22,6 +23,10 @@ export default function TablesPage() {
     queryKey: ['admin-tables'],
     queryFn: async () => (await api.get<AdminTable[]>('/admin/tables')).data,
     refetchInterval: edit ? false : 5000,
+  });
+  const { data: config } = useQuery({
+    queryKey: ['config'],
+    queryFn: async () => (await api.get<Config>('/config')).data,
   });
 
   const savePos = useMutation({
@@ -71,17 +76,25 @@ export default function TablesPage() {
     <div>
       <div className="flex items-center justify-between mb-5">
         <h1 className="display text-2xl font-extrabold">Floor map</h1>
-        <button
-          onClick={() => {
-            setEdit((v) => !v);
-            setSelectedId(null);
-          }}
-          className={`text-sm rounded-full px-4 py-1.5 flex items-center gap-1.5 border ${
-            edit ? 'bg-flame text-ink border-flame font-bold' : 'hairline text-muted'
-          }`}
-        >
-          <Move size={14} /> {edit ? 'Done' : 'Edit layout'}
-        </button>
+        <div className="flex gap-2">
+          <Link
+            to="/admin/qr"
+            className="text-sm rounded-full px-4 py-1.5 flex items-center gap-1.5 border hairline text-muted"
+          >
+            <Printer size={14} /> Print QRs
+          </Link>
+          <button
+            onClick={() => {
+              setEdit((v) => !v);
+              setSelectedId(null);
+            }}
+            className={`text-sm rounded-full px-4 py-1.5 flex items-center gap-1.5 border ${
+              edit ? 'bg-flame text-ink border-flame font-bold' : 'hairline text-muted'
+            }`}
+          >
+            <Move size={14} /> {edit ? 'Done' : 'Edit layout'}
+          </button>
+        </div>
       </div>
 
       {edit && <p className="text-xs text-flame mb-3">Drag tables — the layout saves automatically.</p>}
@@ -116,6 +129,7 @@ export default function TablesPage() {
               cy={pos(t).y}
               selected={t.id === selectedId}
               edit={edit}
+              timeLimitMin={config?.timeLimitMin ?? 90}
               onPointerDown={onTableDown(t)}
               onClick={() => !edit && setSelectedId(t.id)}
             />
@@ -155,6 +169,7 @@ function TableDrawer({ table, onClose }: { table: AdminTable; onClose: () => voi
   const qc = useQueryClient();
   const [party, setParty] = useState(2);
   const [redeem, setRedeem] = useState(false);
+  const [voidArmed, setVoidArmed] = useState(false);
   const [closed, setClosed] = useState<null | { total: number; discount: number; earned: number }>(null);
 
   const invalidate = () => {
@@ -198,6 +213,13 @@ function TableDrawer({ table, onClose }: { table: AdminTable; onClose: () => voi
     onSuccess: (d) => {
       setClosed(d);
       invalidate();
+    },
+  });
+  const voidSeating = useMutation({
+    mutationFn: async () => api.post(`/admin/sessions/${table.session!.id}/void`),
+    onSuccess: () => {
+      invalidate();
+      onClose();
     },
   });
 
@@ -266,6 +288,14 @@ function TableDrawer({ table, onClose }: { table: AdminTable; onClose: () => voi
           <>
             {/* party + bill */}
             <div className="mt-5 rounded-2xl border hairline p-4">
+              <div className="flex items-center justify-between text-xs text-muted mb-3 pb-3 border-b hairline">
+                <span className="flex items-center gap-1.5">
+                  <Timer size={13} /> Seated {minutesSince(s.openedAt)} min
+                </span>
+                <span>
+                  {new Date(s.openedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="flex items-center gap-1.5 text-muted">
                   <Users size={14} /> Party
@@ -369,6 +399,15 @@ function TableDrawer({ table, onClose }: { table: AdminTable; onClose: () => voi
               >
                 {closeBill.isPending ? 'Closing…' : `Close bill · ${money(s.bill.total)}`}
               </button>
+              <button
+                onClick={() => (voidArmed ? voidSeating.mutate() : setVoidArmed(true))}
+                disabled={voidSeating.isPending}
+                className={`w-full mt-2 rounded-2xl py-2.5 text-sm border ${
+                  voidArmed ? 'border-red-400 text-red-400 font-bold' : 'hairline text-muted'
+                }`}
+              >
+                {voidArmed ? 'Tap again — no bill will be charged' : 'Void seating (no bill)'}
+              </button>
             </div>
           </>
         )
@@ -429,6 +468,7 @@ function TableShape({
   cy,
   selected,
   edit,
+  timeLimitMin,
   onClick,
   onPointerDown,
 }: {
@@ -437,14 +477,29 @@ function TableShape({
   cy: number;
   selected: boolean;
   edit: boolean;
+  timeLimitMin: number;
   onClick: () => void;
   onPointerDown: (e: React.PointerEvent) => void;
 }) {
   const busy = !!table.session;
   const call = table.calls.length > 0;
+  const elapsed = table.session ? minutesSince(table.session.openedAt) : 0;
+  const overtime = busy && elapsed > timeLimitMin;
 
-  const stroke = call ? '#FF6B2C' : busy ? 'rgba(52,211,153,0.9)' : 'rgba(245,243,238,0.35)';
-  const fill = call ? 'rgba(255,107,44,0.18)' : busy ? 'rgba(52,211,153,0.12)' : '#141419';
+  const stroke = call
+    ? '#FF6B2C'
+    : overtime
+      ? 'rgba(251,191,36,0.95)'
+      : busy
+        ? 'rgba(52,211,153,0.9)'
+        : 'rgba(245,243,238,0.35)';
+  const fill = call
+    ? 'rgba(255,107,44,0.18)'
+    : overtime
+      ? 'rgba(251,191,36,0.12)'
+      : busy
+        ? 'rgba(52,211,153,0.12)'
+        : '#141419';
   const chairFill = 'rgba(245,243,238,0.28)';
 
   const size: { r: number } | { w: number; h: number } =
@@ -502,9 +557,23 @@ function TableShape({
         {table.number}
       </text>
       {busy && (
-        <text x={cx} y={cy + 2.9} textAnchor="middle" fontSize={1.8} fill="rgba(245,243,238,0.65)">
-          {table.session!.guests}p{table.session!.pendingItems > 0 ? ` · ${table.session!.pendingItems}` : ''}
+        <text
+          x={cx}
+          y={cy + 2.9}
+          textAnchor="middle"
+          fontSize={1.8}
+          fill={overtime ? 'rgba(251,191,36,0.95)' : 'rgba(245,243,238,0.65)'}
+        >
+          {table.session!.guests}p · {elapsed}m
         </text>
+      )}
+      {busy && table.session!.pendingItems > 0 && (
+        <g>
+          <circle cx={cx - halfW + 0.3} cy={cy - halfH + 0.3} r={1.6} fill="#141419" stroke="rgba(52,211,153,0.9)" strokeWidth={0.3} />
+          <text x={cx - halfW + 0.3} y={cy - halfH + 0.95} textAnchor="middle" fontSize={1.7} fontWeight={700} fill="rgba(52,211,153,0.95)">
+            {table.session!.pendingItems}
+          </text>
+        </g>
       )}
       {call && <circle cx={cx + halfW - 0.3} cy={cy - halfH + 0.3} r={1.3} fill="#FF6B2C" />}
     </g>

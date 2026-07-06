@@ -20,6 +20,8 @@ publicRouter.get('/config', async (_req, res) => {
     tagline: s.tagline,
     aycePrice: Number(s.aycePrice),
     roundLimit: s.roundLimit,
+    timeLimitMin: s.timeLimitMin,
+    guestCanOpen: s.guestCanOpen,
   });
 });
 
@@ -67,6 +69,10 @@ publicRouter.post('/sessions', async (req, res) => {
     where: { tableId: table.id, status: 'OPEN' },
   });
   if (existing) return res.json({ id: existing.id, existing: true });
+
+  const settings = await getSettings();
+  if (!settings.guestCanOpen)
+    return res.status(403).json({ error: 'Please ask our staff to seat you' });
 
   const session = await prisma.tableSession.create({
     data: { tableId: table.id, guests: body.data.guests, guestId: body.data.guestId },

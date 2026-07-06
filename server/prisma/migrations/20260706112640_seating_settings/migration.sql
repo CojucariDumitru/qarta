@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Settings" ADD COLUMN     "guestCanOpen" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "timeLimitMin" INTEGER NOT NULL DEFAULT 90;

@@ -3,6 +3,8 @@ export interface Config {
   tagline: string;
   aycePrice: number;
   roundLimit: number;
+  timeLimitMin: number;
+  guestCanOpen: boolean;
 }
 
 export interface MenuItem {
@@ -138,7 +140,12 @@ export interface Settings {
   tagline: string;
   aycePrice: number;
   roundLimit: number;
+  timeLimitMin: number;
+  guestCanOpen: boolean;
 }
+
+/** Whole minutes since an ISO timestamp. */
+export const minutesSince = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
 
 export const money = (v: number | string) => `$${Number(v).toFixed(2)}`;
 export const pts = (p: number) => `${(p / 100).toFixed(2)}`;

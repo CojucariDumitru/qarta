@@ -12,12 +12,13 @@ import {
   Plus,
   Receipt,
   Star,
+  Timer,
   Users,
   X,
 } from 'lucide-react';
 import { api } from '../api';
 import { useGuest } from './useGuest';
-import { money, pts, type Category, type Config, type MenuItem, type SessionDetail, type TableInfo } from '../types';
+import { minutesSince, money, pts, type Category, type Config, type MenuItem, type SessionDetail, type TableInfo } from '../types';
 
 interface CartLine {
   item: MenuItem;
@@ -83,6 +84,25 @@ function PartyGate({
     mutationFn: async () => api.post('/sessions', { tableCode, guests, guestId: guest?.guestId }),
     onSuccess: onStarted,
   });
+
+  // production mode: staff seats guests; this screen just waits for the seating to open
+  if (config && !config.guestCanOpen)
+    return (
+      <div className="min-h-screen max-w-lg mx-auto px-6 flex flex-col justify-center pb-16 text-center">
+        <p className="text-[11px] tracking-[0.25em] text-flame font-semibold">
+          TABLE {table.number} · {table.zone.toUpperCase()}
+        </p>
+        <h1 className="display text-4xl font-extrabold mt-2">{config.name}</h1>
+        <p className="text-muted mt-1">{config.tagline}</p>
+        <div className="mt-8 rounded-3xl border hairline p-6">
+          <span className="inline-block w-2.5 h-2.5 rounded-full bg-flame animate-pulse" />
+          <p className="font-bold text-lg mt-3">One moment…</p>
+          <p className="text-muted text-sm mt-1">
+            Our staff will open your table shortly. The menu appears here automatically.
+          </p>
+        </div>
+      </div>
+    );
 
   return (
     <div className="min-h-screen max-w-lg mx-auto px-6 flex flex-col justify-center pb-16">
@@ -329,6 +349,14 @@ function TableTab({ session, tableCode }: { session: SessionDetail; tableCode: s
   const [phoneOpen, setPhoneOpen] = useState(false);
   const [called, setCalled] = useState<'WAITER' | 'BILL' | null>(null);
 
+  const { data: config } = useQuery({
+    queryKey: ['config'],
+    queryFn: async () => (await api.get<Config>('/config')).data,
+  });
+  const elapsed = minutesSince(session.openedAt);
+  const limit = config?.timeLimitMin ?? 90;
+  const overtime = elapsed > limit;
+
   const call = useMutation({
     mutationFn: async (kind: 'WAITER' | 'BILL') => api.post('/waiter-call', { tableCode, kind }),
     onSuccess: (_d, kind) => setCalled(kind),
@@ -344,9 +372,15 @@ function TableTab({ session, tableCode }: { session: SessionDetail; tableCode: s
     <div className="px-5 pt-5">
       {/* live bill */}
       <div className="rounded-3xl border hairline p-5">
-        <p className="text-sm text-muted flex items-center gap-1.5">
-          <Receipt size={14} /> Your bill so far
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted flex items-center gap-1.5">
+            <Receipt size={14} /> Your bill so far
+          </p>
+          <span className={`text-xs font-semibold ${overtime ? 'text-flame' : 'text-muted'}`}>
+            <Timer size={12} className="inline -mt-0.5 mr-1" />
+            {elapsed} / {limit} min
+          </span>
+        </div>
         <div className="mt-3 space-y-1.5 text-sm">
           <div className="flex justify-between">
             <span>

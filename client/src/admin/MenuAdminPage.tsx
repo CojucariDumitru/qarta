@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Pencil, Plus, Trash2, Upload, X } from 'lucide-react';
 import { api } from '../api';
 import { money, type Category, type MenuItem } from '../types';
 
@@ -9,6 +9,19 @@ type Draft = Partial<Omit<MenuItem, 'price'>> & { price?: string };
 export default function MenuAdminPage() {
   const qc = useQueryClient();
   const [editing, setEditing] = useState<Draft | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const uploadPhoto = useMutation({
+    mutationFn: async (file: File) => {
+      const form = new FormData();
+      form.append('file', file);
+      const { data } = await api.post<{ url: string }>('/admin/upload', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return data.url;
+    },
+    onSuccess: (url) => setEditing((e) => (e ? { ...e, image: url } : e)),
+  });
 
   const { data: categories } = useQuery({
     queryKey: ['admin-menu'],
@@ -124,7 +137,34 @@ export default function MenuAdminPage() {
               {!editing.ayce && (
                 <Field label="Price, $" value={editing.price ?? ''} onChange={(v) => setEditing({ ...editing, price: v })} />
               )}
-              <Field label="Photo URL" value={editing.image ?? ''} onChange={(v) => setEditing({ ...editing, image: v })} />
+
+              {/* photo: upload or paste a URL */}
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <Field label="Photo" value={editing.image ?? ''} onChange={(v) => setEditing({ ...editing, image: v })} />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={uploadPhoto.isPending}
+                  className="shrink-0 border hairline rounded-xl px-3 py-2.5 text-sm flex items-center gap-1.5 text-muted hover:text-cream disabled:opacity-50"
+                >
+                  <Upload size={14} /> {uploadPhoto.isPending ? 'Uploading…' : 'Upload'}
+                </button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) uploadPhoto.mutate(f);
+                    e.target.value = '';
+                  }}
+                />
+              </div>
+              {uploadPhoto.isError && <p className="text-red-400 text-xs">Upload failed — try an image under 4 MB.</p>}
+              {editing.image && <img src={editing.image} className="w-16 h-16 rounded-xl object-cover" />}
               <label className="block text-xs text-muted">
                 Category
                 <select

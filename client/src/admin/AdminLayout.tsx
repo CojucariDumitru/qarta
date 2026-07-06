@@ -11,22 +11,21 @@ import {
   BarChart3,
 } from 'lucide-react';
 import { api } from '../api';
-import type { AdminRound } from '../types';
+import type { AdminRound, AdminTable } from '../types';
 
 const NAV = [
   { to: '/admin', end: true, label: 'Dashboard', icon: BarChart3 },
-  { to: '/admin/orders', label: 'Rounds', icon: ListOrdered, badge: true },
-  { to: '/admin/tables', label: 'Floor', icon: LayoutGrid },
+  { to: '/admin/orders', label: 'Rounds', icon: ListOrdered, badge: 'rounds' as const },
+  { to: '/admin/tables', label: 'Floor', icon: LayoutGrid, badge: 'calls' as const },
   { to: '/admin/menu', label: 'Menu', icon: UtensilsCrossed },
   { to: '/admin/guests', label: 'Guests', icon: Users },
   { to: '/admin/settings', label: 'Settings', icon: Settings },
 ];
 
-/** Two-tone chime for a fresh round (works after any user interaction with the page). */
-function chime() {
+function playNotes(notes: [number, number][]) {
   try {
     const ctx = new AudioContext();
-    const note = (t: number, f: number) => {
+    for (const [t, f] of notes) {
       const o = ctx.createOscillator();
       const g = ctx.createGain();
       o.frequency.value = f;
@@ -36,13 +35,16 @@ function chime() {
       g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t + 0.25);
       o.start(ctx.currentTime + t);
       o.stop(ctx.currentTime + t + 0.3);
-    };
-    note(0, 880);
-    note(0.18, 1318);
+    }
   } catch {
     /* no audio available */
   }
 }
+
+/** Two-tone chime for a fresh round (works after any user interaction with the page). */
+const chime = () => playNotes([[0, 880], [0.18, 1318]]);
+/** Urgent triple tone for a waiter/bill call. */
+const callChime = () => playNotes([[0, 1046], [0.15, 1046], [0.3, 1568]]);
 
 export default function AdminLayout() {
   const navigate = useNavigate();
@@ -64,6 +66,26 @@ export default function AdminLayout() {
     if (prev.current && [...ids].some((id) => !prev.current!.has(id))) chime();
     prev.current = ids;
   }, [active]);
+
+  // waiter/bill calls: urgent chime + badge on the Floor tab
+  const { data: tables } = useQuery({
+    queryKey: ['admin-tables-watch'],
+    queryFn: async () => (await api.get<AdminTable[]>('/admin/tables')).data,
+    refetchInterval: 6000,
+    enabled: authed,
+  });
+  const callCount = tables?.reduce((n, t) => n + t.calls.length, 0) ?? 0;
+
+  const prevCalls = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (!tables) return;
+    const ids = new Set(tables.flatMap((t) => t.calls.map((c) => c.id)));
+    if (prevCalls.current && [...ids].some((id) => !prevCalls.current!.has(id))) callChime();
+    prevCalls.current = ids;
+  }, [tables]);
+
+  const badgeCount = (kind?: 'rounds' | 'calls') =>
+    kind === 'rounds' ? newCount : kind === 'calls' ? callCount : 0;
 
   useEffect(() => {
     document.title = newCount > 0 ? `(${newCount}) Rounds — QARTA` : 'QARTA — staff';
@@ -90,9 +112,9 @@ export default function AdminLayout() {
             }
           >
             <Icon size={16} /> {label}
-            {badge && newCount > 0 && (
+            {badge && badgeCount(badge) > 0 && (
               <span className="ml-auto bg-flame text-ink text-[10px] font-bold rounded-full min-w-[18px] h-[18px] grid place-items-center px-1">
-                {newCount}
+                {badgeCount(badge)}
               </span>
             )}
           </NavLink>

@@ -22,6 +22,8 @@ export default function SettingsPage() {
         tagline: form!.tagline,
         aycePrice: Number(form!.aycePrice),
         roundLimit: Number(form!.roundLimit),
+        timeLimitMin: Number(form!.timeLimitMin),
+        guestCanOpen: form!.guestCanOpen,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['settings'] });
@@ -48,6 +50,25 @@ export default function SettingsPage() {
           value={String(form.roundLimit)}
           onChange={(v) => setForm({ ...form, roundLimit: v as unknown as number })}
         />
+        <Field
+          label="Seating time limit, minutes"
+          value={String(form.timeLimitMin)}
+          onChange={(v) => setForm({ ...form, timeLimitMin: v as unknown as number })}
+        />
+        <label className="flex items-center justify-between text-sm py-2 border-b hairline">
+          <span>
+            Guests can start a seating themselves
+            <span className="block text-xs text-muted mt-0.5">
+              Off = staff opens tables from the Floor map (recommended in production)
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={form.guestCanOpen}
+            onChange={(e) => setForm({ ...form, guestCanOpen: e.target.checked })}
+            className="accent-[#FF6B2C] w-4 h-4"
+          />
+        </label>
       </div>
 
       <button

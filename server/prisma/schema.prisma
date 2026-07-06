@@ -17,11 +17,13 @@ model User {
 
 /// Singleton (id = 1): restaurant profile + AYCE pricing rules.
 model Settings {
-  id         Int     @id @default(1)
-  name       String  @default("KAIYO")
-  tagline    String  @default("Asian Grill & Sushi · All You Can Eat")
-  aycePrice  Decimal @default(29.90) @db.Decimal(10, 2) // per person
-  roundLimit Int     @default(5) // AYCE items per person per round
+  id           Int     @id @default(1)
+  name         String  @default("KAIYO")
+  tagline      String  @default("Asian Grill & Sushi · All You Can Eat")
+  aycePrice    Decimal @default(29.90) @db.Decimal(10, 2) // per person
+  roundLimit   Int     @default(5) // AYCE items per person per round
+  timeLimitMin Int     @default(90) // AYCE seating time limit
+  guestCanOpen Boolean @default(true) // false = only staff seats guests (production mode)
 }
 
 model Category {

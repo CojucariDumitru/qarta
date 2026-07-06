@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import multer from 'multer';
+import { v2 as cloudinary } from 'cloudinary';
 import { z } from 'zod';
 import { prisma } from '../prisma';
 import { env } from '../env';
@@ -9,6 +11,16 @@ import { earnPoints, tierFor } from '../loyalty';
 import { sessionDetail } from './public';
 
 export const adminRouter = Router();
+
+cloudinary.config({
+  cloud_name: env.CLOUDINARY_CLOUD_NAME,
+  api_key: env.CLOUDINARY_API_KEY,
+  api_secret: env.CLOUDINARY_API_SECRET,
+});
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 4 * 1024 * 1024 }, // Vercel functions cap request bodies at ~4.5MB
+});
 
 adminRouter.post('/login', async (req, res) => {
   const body = z.object({ email: z.string().email(), password: z.string() }).safeParse(req.body);
@@ -179,6 +191,38 @@ adminRouter.post('/sessions/:id/close', async (req, res) => {
   });
 
   res.json({ ...result, gross, extras, ayceTotal: s.guests * Number(settings!.aycePrice) });
+});
+
+/** Void a seating: guests left / opened by mistake — no bill, rounds cancelled. */
+adminRouter.post('/sessions/:id/void', async (req, res) => {
+  const s = await prisma.tableSession.findUnique({ where: { id: req.params.id } });
+  if (!s || s.status !== 'OPEN') return res.status(404).json({ error: 'Open session not found' });
+  await prisma.$transaction([
+    prisma.order.updateMany({ where: { sessionId: s.id }, data: { status: 'CANCELLED' } }),
+    prisma.tableSession.update({
+      where: { id: s.id },
+      data: { status: 'VOID', closedAt: new Date(), total: 0 },
+    }),
+    prisma.waiterCall.updateMany({
+      where: { tableId: s.tableId, status: 'OPEN' },
+      data: { status: 'RESOLVED' },
+    }),
+  ]);
+  res.json({ ok: true });
+});
+
+/** Menu photo upload → Cloudinary; returns a square delivery URL. */
+adminRouter.post('/upload', upload.single('file'), async (req, res) => {
+  if (!req.file?.mimetype.startsWith('image/'))
+    return res.status(400).json({ error: 'Attach an image file' });
+  try {
+    const b64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+    const up = await cloudinary.uploader.upload(b64, { folder: 'qarta/uploads' });
+    const url = `https://res.cloudinary.com/${env.CLOUDINARY_CLOUD_NAME}/image/upload/c_fill,g_auto,w_900,h_900,f_auto,q_auto/${up.public_id}`;
+    res.json({ url });
+  } catch (e) {
+    res.status(500).json({ error: 'Upload failed — try a smaller image' });
+  }
 });
 
 adminRouter.post('/calls/:id/resolve', async (req, res) => {
@@ -364,6 +408,8 @@ adminRouter.patch('/settings', async (req, res) => {
       tagline: z.string().max(120).optional(),
       aycePrice: z.number().positive().optional(),
       roundLimit: z.number().int().min(1).max(20).optional(),
+      timeLimitMin: z.number().int().min(15).max(360).optional(),
+      guestCanOpen: z.boolean().optional(),
     })
     .safeParse(req.body);
   if (!body.success) return res.status(400).json({ error: 'Invalid settings' });
