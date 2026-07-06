@@ -55,12 +55,12 @@ export default function AdminLayout() {
     refetchInterval: 6000,
     enabled: authed,
   });
-  const newCount = active?.length ?? 0;
+  const newCount = active?.filter((o) => o.status === 'NEW').length ?? 0;
 
   const prev = useRef<Set<string> | null>(null);
   useEffect(() => {
     if (!active) return;
-    const ids = new Set(active.map((o) => o.id));
+    const ids = new Set(active.filter((o) => o.status === 'NEW').map((o) => o.id));
     if (prev.current && [...ids].some((id) => !prev.current!.has(id))) chime();
     prev.current = ids;
   }, [active]);

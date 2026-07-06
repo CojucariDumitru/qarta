@@ -15,11 +15,17 @@ export default function OrdersPage() {
   const [showAll, setShowAll] = useState(false);
   const qc = useQueryClient();
 
-  const { data: rounds } = useQuery({
+  const { data } = useQuery({
     queryKey: ['admin-orders', showAll],
     queryFn: async () => (await api.get<AdminRound[]>(`/admin/orders${showAll ? '?all=1' : ''}`)).data,
     refetchInterval: 5000,
   });
+  // undelivered rounds first, then completed ones (still visible while the table is seated)
+  const rounds = data
+    ? [...data].sort((a, b) =>
+        a.status === b.status ? 0 : a.status === 'NEW' ? -1 : b.status === 'NEW' ? 1 : 0
+      )
+    : undefined;
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['admin-orders'] });
@@ -49,11 +55,14 @@ export default function OrdersPage() {
         </button>
       </div>
 
-      {rounds?.length === 0 && <p className="text-muted">No active rounds — the kitchen breathes.</p>}
+      {rounds?.length === 0 && <p className="text-muted">No seated tables right now — the kitchen breathes.</p>}
 
       <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
         {rounds?.map((o) => (
-          <div key={o.id} className="rounded-2xl border hairline p-4 flex flex-col">
+          <div
+            key={o.id}
+            className={`rounded-2xl border hairline p-4 flex flex-col ${o.status === 'DONE' ? 'opacity-60' : ''}`}
+          >
             <div className="flex items-center justify-between">
               <p className="font-bold">
                 #{o.number} · Table {o.session.table.number}

@@ -204,9 +204,11 @@ adminRouter.patch('/order-items/:id/delivered', async (req, res) => {
   res.json({ ok: true, orderDone: done });
 });
 
-/** Live rounds board (active by default, ?all=1 for history). */
+/** Live rounds board: every round of currently seated tables (?all=1 for history). */
 adminRouter.get('/orders', async (req, res) => {
-  const where = req.query.all ? {} : { status: 'NEW' };
+  const where = req.query.all
+    ? {}
+    : { session: { status: 'OPEN' }, status: { not: 'CANCELLED' } };
   const orders = await prisma.order.findMany({
     where,
     orderBy: { createdAt: 'desc' },
